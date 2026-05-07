@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>운정신도시 단지 시세</h1>
+<p class="subtitle">최근 3개월 평균 거래가 · 거래 가장 많은 평형 대표 표시</p>
+
+<div class="card-grid">
+  {% for c in cards %}
+  <a href="/complex/{{ c.name }}" class="card">
+    <div class="card-dong">{{ c.dong }}</div>
+    <h3 class="card-title">{{ c.name }}</h3>
+    {% if c.stats %}
+      <div class="card-bucket">{{ c.main_bucket }}</div>
+      <div class="card-price">{{ c.stats.avg | won }}</div>
+      <div class="card-meta">
+        <span>{{ c.stats.count }}건 거래</span>
+        {% if c.stats.change_pct is not none %}
+          <span class="{% if c.stats.change_pct > 0 %}up{% elif c.stats.change_pct < 0 %}down{% endif %}">
+            {% if c.stats.change_pct > 0 %}↑{% elif c.stats.change_pct < 0 %}↓{% endif %}
+            {{ c.stats.change_pct }}%
+          </span>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="card-empty">최근 거래 없음</div>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

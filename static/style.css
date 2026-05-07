@@ -1,0 +1,169 @@
+/* 파주 운정 시세 대시보드 - 스타일시트 */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+               "Malgun Gothic", "맑은 고딕", sans-serif;
+  background: #f8fafc;
+  color: #1e293b;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+/* ───── 헤더/푸터 ───── */
+.site-header {
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 14px 0;
+  position: sticky; top: 0; z-index: 10;
+}
+.site-header .container { display: flex; align-items: center; gap: 12px; }
+.brand {
+  font-size: 17px; font-weight: 700; color: #1e293b;
+  text-decoration: none;
+}
+.tag {
+  font-size: 11px; padding: 3px 8px; border-radius: 12px;
+  background: #dbeafe; color: #1e40af; font-weight: 500;
+}
+.site-footer {
+  margin-top: 60px; padding: 24px 0;
+  border-top: 1px solid #e2e8f0;
+  text-align: center; color: #64748b;
+}
+
+main { padding: 32px 0; }
+h1 { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+h2 { font-size: 17px; font-weight: 600; margin: 20px 0 14px; }
+.subtitle { color: #64748b; margin-bottom: 24px; font-size: 14px; }
+.muted { color: #94a3b8; font-size: 12px; }
+
+/* ───── 홈: 카드 그리드 ───── */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.card {
+  background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 18px; text-decoration: none; color: inherit;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  border-color: #3b82f6;
+}
+.card-dong {
+  font-size: 11px; color: #64748b; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.card-title {
+  font-size: 14px; font-weight: 600; line-height: 1.4;
+  min-height: 38px;
+}
+.card-bucket {
+  font-size: 11px; color: #475569;
+  background: #f1f5f9; padding: 2px 8px; border-radius: 6px;
+  display: inline-block; align-self: flex-start;
+}
+.card-price {
+  font-size: 22px; font-weight: 700; color: #1e293b;
+  margin-top: 4px;
+}
+.card-meta {
+  display: flex; justify-content: space-between;
+  font-size: 12px; color: #64748b; margin-top: 2px;
+}
+.card-meta .up { color: #dc2626; font-weight: 600; }
+.card-meta .down { color: #2563eb; font-weight: 600; }
+.card-empty {
+  color: #94a3b8; font-size: 13px; padding: 18px 0;
+}
+
+/* ───── 상세: 기간 탭 ───── */
+.back-link {
+  display: inline-block; margin-bottom: 14px;
+  color: #3b82f6; text-decoration: none; font-size: 14px;
+}
+.back-link:hover { text-decoration: underline; }
+
+.period-tabs {
+  display: flex; gap: 4px; margin: 20px 0 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.tab {
+  padding: 10px 18px; text-decoration: none; color: #64748b;
+  border-bottom: 2px solid transparent;
+  font-size: 14px; font-weight: 500;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover { color: #1e293b; }
+.tab.active {
+  color: #3b82f6; border-bottom-color: #3b82f6; font-weight: 600;
+}
+
+/* ───── 상세: 평형 섹션 ───── */
+.bucket-section {
+  background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 22px; margin-bottom: 18px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.stat {
+  padding: 12px 14px; background: #f8fafc; border-radius: 8px;
+}
+.stat-label {
+  font-size: 11px; color: #64748b; margin-bottom: 4px;
+  font-weight: 500;
+}
+.stat-value {
+  font-size: 16px; font-weight: 600; color: #1e293b;
+}
+.stat-value.primary { color: #3b82f6; font-size: 20px; }
+.stat-value.up { color: #dc2626; }
+.stat-value.down { color: #2563eb; }
+
+.chart-img {
+  width: 100%; height: auto; border-radius: 8px;
+  display: block;
+}
+
+.empty {
+  color: #64748b; font-style: italic;
+  padding: 32px 0; text-align: center;
+}
+
+/* ───── 최근 거래 테이블 ───── */
+.trades-table {
+  width: 100%; border-collapse: collapse;
+  background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+  overflow: hidden;
+}
+.trades-table th, .trades-table td {
+  padding: 11px 16px; text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+}
+.trades-table th {
+  background: #f8fafc; font-size: 11px; color: #64748b;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.trades-table tr:last-child td { border-bottom: none; }
+.trades-table tr:hover td { background: #f8fafc; }
+
+/* ───── 모바일 ───── */
+@media (max-width: 600px) {
+  h1 { font-size: 20px; }
+  .card-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-value.primary { font-size: 18px; }
+}

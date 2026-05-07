@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ apt_name }} · 파주 운정 시세{% endblock %}
+{% block content %}
+<a href="/" class="back-link">← 단지 목록으로</a>
+
+<h1>{{ apt_name }}</h1>
+{% if apt_info %}<p class="subtitle">{{ apt_info.dong }}</p>{% endif %}
+
+<div class="period-tabs">
+  {% for p, label in [('6M', '6개월'), ('3M', '3개월'), ('1M', '1개월'), ('1W', '주간')] %}
+    <a href="/complex/{{ apt_name }}?period={{ p }}"
+       class="tab {% if period == p %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+{% if not summary %}
+  <p class="empty">선택한 기간에 거래가 없습니다.</p>
+{% else %}
+  {% for bucket, s in summary.items() %}
+  <section class="bucket-section">
+    <h2>{{ bucket }}</h2>
+
+    <div class="stats-grid">
+      <div class="stat">
+        <div class="stat-label">평균가</div>
+        <div class="stat-value primary">{{ s.avg | won }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">중앙값</div>
+        <div class="stat-value">{{ s.median | won }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">거래</div>
+        <div class="stat-value">{{ s.count }}건</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">직전 대비</div>
+        <div class="stat-value
+          {% if s.change_pct is not none and s.change_pct > 0 %}up
+          {% elif s.change_pct is not none and s.change_pct < 0 %}down{% endif %}">
+          {% if s.change_pct is none %}—
+          {% elif s.change_pct > 0 %}+{{ s.change_pct }}%
+          {% else %}{{ s.change_pct }}%{% endif %}
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">최저</div>
+        <div class="stat-value">{{ s.min | won }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">최고</div>
+        <div class="stat-value">{{ s.max | won }}</div>
+      </div>
+    </div>
+
+    {% if charts.get(bucket) %}
+      <img src="{{ charts[bucket] }}" alt="{{ bucket }} 추이" class="chart-img">
+    {% endif %}
+  </section>
+  {% endfor %}
+{% endif %}
+
+<section class="recent">
+  <h2>최근 거래 10건</h2>
+  {% if recent %}
+  <table class="trades-table">
+    <thead>
+      <tr><th>계약일</th><th>면적</th><th>층</th><th>금액</th></tr>
+    </thead>
+    <tbody>
+      {% for t in recent %}
+      <tr>
+        <td>{{ t.deal_date.strftime('%Y-%m-%d') }}</td>
+        <td>{{ '%.2f' % t.area_sqm }}㎡ <span class="muted">({{ t.area_bucket or '-' }})</span></td>
+        <td>{{ t.floor }}층</td>
+        <td><strong>{{ t.deal_amount | won }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="empty">거래 기록이 없습니다.</p>
+  {% endif %}
+</section>
+{% endblock %}

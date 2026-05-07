@@ -1,0 +1,22 @@
+# Python 가상환경
+venv/
+__pycache__/
+*.pyc
+
+# 비밀값
+.env
+
+# macOS 시스템 파일
+.DS_Store
+
+# 차트 캐시 (자동 생성됨)
+static/charts/
+
+# SQLite DB
+*.db
+*.sqlite
+*.sqlite3
+
+# 에디터
+.vscode/
+.idea/

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}파주 운정 시세 대시보드{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="brand">🏢 파주 운정 시세</a>
+      <span class="tag">실거래가 기반</span>
+    </div>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <small>출처: 국토교통부 실거래가 공개시스템 · 신고지연 약 30일 (최근 데이터는 잠정치)</small>
+    </div>
+  </footer>
+</body>
+</html>
