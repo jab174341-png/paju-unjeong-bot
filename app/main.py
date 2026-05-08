@@ -19,6 +19,7 @@ from fastapi.responses import HTMLResponse
 
 from app.analysis.loader import load_unjeong_trades
 from app.analysis.aggregate import summarize_complex, get_trend_series
+from app.analysis.listings import get_listings_summary
 from app.chart.builder import build_trend_chart
 from app.data.complexes import UNJEONG_COMPLEXES
 
@@ -91,6 +92,14 @@ def detail(request: Request, apt_name: str, period: str = "3M"):
 
     apt_info = next((c for c in UNJEONG_COMPLEXES if c["name"] == apt_name), None)
 
+    # 네이버 부동산 매물 요약 (실패해도 페이지는 정상 표시)
+    listings = None
+    if apt_info:
+        try:
+            listings = get_listings_summary(apt_name, apt_info["dong"])
+        except Exception as e:
+            print(f"⚠️  네이버 매물 조회 실패 ({apt_name}): {e}")
+
     return templates.TemplateResponse("detail.html", {
         "request": request,
         "apt_name": apt_name,
@@ -99,4 +108,5 @@ def detail(request: Request, apt_name: str, period: str = "3M"):
         "summary": summary,
         "charts": charts,
         "recent": recent,
+        "listings": listings,
     })

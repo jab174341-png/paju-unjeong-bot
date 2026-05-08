@@ -160,10 +160,76 @@ h2 { font-size: 17px; font-weight: 600; margin: 20px 0 14px; }
 .trades-table tr:last-child td { border-bottom: none; }
 .trades-table tr:hover td { background: #f8fafc; }
 
+/* ───── 현재 매물 (네이버) 섹션 ───── */
+.listings-section {
+  background: linear-gradient(135deg, #fef3c7 0%, #fef9e8 100%);
+  border: 1px solid #fcd34d;
+  border-radius: 12px;
+  padding: 22px;
+  margin: 20px 0;
+}
+.listings-header {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+}
+.listings-header h2 { margin: 0; font-size: 17px; color: #78350f; }
+.listings-header h2 small { color: #92400e; font-weight: 400; font-size: 12px; }
+.badge-match {
+  background: #10b981; color: white;
+  padding: 4px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-no-match {
+  background: #94a3b8; color: white;
+  padding: 4px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+.listings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px; margin-bottom: 16px;
+}
+.listing-stat {
+  background: white; padding: 10px 12px; border-radius: 8px;
+}
+.listing-stat.wide { grid-column: span 3; }
+.listing-label {
+  font-size: 11px; color: #92400e;
+  font-weight: 500; margin-bottom: 4px;
+}
+.listing-value { font-size: 16px; font-weight: 600; color: #78350f; }
+.listing-value.primary { color: #b45309; font-size: 22px; }
+
+.naver-link {
+  display: inline-block;
+  background: #03c75a;  /* 네이버 그린 */
+  color: white !important;
+  padding: 11px 18px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600; font-size: 14px;
+  transition: background 0.15s, transform 0.15s;
+}
+.naver-link:hover {
+  background: #02a14a;
+  transform: translateY(-1px);
+}
+
+.listings-note {
+  margin-top: 12px;
+  font-size: 12px; color: #78350f;
+  line-height: 1.5;
+}
+.listings-note strong { color: #b45309; }
+
 /* ───── 모바일 ───── */
 @media (max-width: 600px) {
   h1 { font-size: 20px; }
   .card-grid { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .stat-value.primary { font-size: 18px; }
+  .listings-grid { grid-template-columns: repeat(3, 1fr); }
+  .listing-stat.wide { grid-column: span 3; }
+  .listing-value { font-size: 14px; }
+  .listing-value.primary { font-size: 18px; }
 }
