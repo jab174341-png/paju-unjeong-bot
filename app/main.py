@@ -225,6 +225,40 @@ def chart_endpoint(apt_name: str, bucket: str):
         raise HTTPException(status_code=500, detail="chart generation failed")
 
 
+@app.get("/api/debug/data")
+def debug_data():
+    """현재 in-memory 캐시 상태 진단용. 단지별 거래 수 반환."""
+    df = _get_trades_cached()
+    if df is None or df.empty:
+        return JSONResponse({"total_trades": 0, "unique_complexes": 0})
+    counts = df["apt_name"].value_counts().to_dict()
+    return JSONResponse({
+        "total_trades": int(len(df)),
+        "unique_complexes": int(df["apt_name"].nunique()),
+        "complex_trade_counts": {k: int(v) for k, v in counts.items()},
+    })
+
+
+@app.get("/api/debug/refresh")
+def debug_refresh():
+    """메모리 캐시 강제 무효화. 다음 요청 때 재빌드됨."""
+    _trades_cache["df"] = None
+    _trades_cache["expires_at"] = None
+    _home_cards_cache["cards"] = None
+    _home_cards_cache["expires_at"] = None
+    # 차트 PNG 캐시도 청소
+    chart_dir = PROJECT_ROOT / "static" / "charts"
+    removed = 0
+    if chart_dir.exists():
+        for f in chart_dir.glob("*.png"):
+            try:
+                f.unlink()
+                removed += 1
+            except Exception:
+                pass
+    return JSONResponse({"ok": True, "charts_removed": removed})
+
+
 @app.get("/api/listings")
 def api_listings(apt_name: str, dong: str):
     """네이버 부동산 매물 요약 (JSON, 비동기 로드용).
