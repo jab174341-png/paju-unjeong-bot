@@ -14,6 +14,14 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import pandas as pd
 
+# 한글 폰트 자동 설정 (Render 리눅스 컨테이너에는 한글 폰트가 없음)
+# koreanize_matplotlib 는 나눔고딕 TTF를 패키지에 내장하여 어디서든 작동.
+# import 만으로 plt.rcParams 가 자동 설정됨.
+try:
+    import koreanize_matplotlib  # noqa: F401  (import 자체가 설정 트리거)
+except Exception as e:
+    print(f"⚠️  koreanize-matplotlib 로드 실패, 한글 깨질 수 있음: {e}")
+
 # 차트 PNG 파일 캐시 유효 기간 (초)
 # 거래 데이터가 자주 바뀌지 않으므로 10분간 재사용해도 충분
 CHART_CACHE_SECONDS = 10 * 60
@@ -22,23 +30,8 @@ CHART_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "charts"
 CHART_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _setup_korean_font():
-    """한글 폰트를 자동 감지하여 설정. Mac/Linux/Windows 모두 시도."""
-    candidates = [
-        "AppleGothic",          # macOS 기본
-        "Apple SD Gothic Neo",  # macOS 모던
-        "NanumGothic",          # 리눅스/공통
-        "Malgun Gothic",        # Windows
-    ]
-    available = {f.name for f in fm.fontManager.ttflist}
-    for c in candidates:
-        if c in available:
-            plt.rcParams["font.family"] = c
-            break
-    plt.rcParams["axes.unicode_minus"] = False  # 마이너스 기호 깨짐 방지
-
-
-_setup_korean_font()
+# 마이너스 기호 깨짐 방지 (한글 폰트와 충돌하기 쉬움)
+plt.rcParams["axes.unicode_minus"] = False
 
 
 def safe_filename(name: str) -> str:
