@@ -42,6 +42,14 @@ HEADERS = {
 
 DB_PATH = Path(__file__).resolve().parent.parent.parent / "cache.db"
 
+# 회로 차단기 (Circuit Breaker):
+# 네이버가 한 번이라도 timeout/실패하면 BACKOFF_SECONDS 동안 호출 자체를 건너뛰고
+# 캐시(있으면 stale도 OK) 또는 빈 결과를 반환합니다.
+# Render Singapore에서 네이버까지 느릴 때 매 동마다 timeout(15s × 6동 = 90초)을
+# 기다리지 않도록 하기 위함.
+_NAVER_BACKOFF_SECONDS = 600  # 10분
+_naver_blocked_until = 0.0  # unix timestamp
+
 
 def _get_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
@@ -81,19 +89,27 @@ def fetch_complex_list(cortar_no: str, max_age_hours: int = 3) -> List[Dict]:
         if datetime.now() - fetched_at < timedelta(hours=max_age_hours):
             return json.loads(row["payload"])
 
+    # 회로 차단기: 최근 실패했다면 네이버 호출 자체를 건너뜀
+    global _naver_blocked_until
+    if time.time() < _naver_blocked_until:
+        if row:
+            return json.loads(row["payload"])  # stale 캐시라도 반환
+        return []
+
     # 캐시 만료/없음 → 새로 호출
     url = (
         "https://m.land.naver.com/cluster/ajax/complexList"
         f"?cortarNo={cortar_no}&rletTpCd=APT&tradTpCd=A1&z=14"
     )
     try:
-        time.sleep(1)  # rate-limit 회피용 짧은 지연
-        r = requests.get(url, headers=HEADERS, timeout=15)
+        r = requests.get(url, headers=HEADERS, timeout=5)  # 15s → 5s
         r.raise_for_status()
         data = r.json()
         result = data.get("result") or []
     except Exception as e:
         print(f"⚠️  네이버 API 호출 실패 (cortarNo={cortar_no}): {e}")
+        # 회로 차단 활성화 (10분간 다른 cortarNo도 호출 안 함)
+        _naver_blocked_until = time.time() + _NAVER_BACKOFF_SECONDS
         # 에러 시 stale cache라도 반환
         if row:
             return json.loads(row["payload"])
