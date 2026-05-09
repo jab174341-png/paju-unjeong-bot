@@ -16,7 +16,7 @@ from urllib.parse import unquote
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.analysis.loader import load_unjeong_trades
 from app.analysis.aggregate import summarize_complex, get_trend_series
@@ -138,14 +138,8 @@ def detail(request: Request, apt_name: str, period: str = "3M"):
 
     apt_info = next((c for c in UNJEONG_COMPLEXES if c["name"] == apt_name), None)
 
-    # 네이버 부동산 매물 요약 (실패해도 페이지는 정상 표시)
-    listings = None
-    if apt_info:
-        try:
-            listings = get_listings_summary(apt_name, apt_info["dong"])
-        except Exception as e:
-            print(f"⚠️  네이버 매물 조회 실패 ({apt_name}): {e}")
-
+    # 네이버 매물 정보는 비동기로 별도 호출 (/api/listings)
+    # 페이지 렌더 시 네이버를 기다리지 않아 빠른 응답 보장
     return templates.TemplateResponse("detail.html", {
         "request": request,
         "apt_name": apt_name,
@@ -154,5 +148,19 @@ def detail(request: Request, apt_name: str, period: str = "3M"):
         "summary": summary,
         "charts": charts,
         "recent": recent,
-        "listings": listings,
     })
+
+
+@app.get("/api/listings")
+def api_listings(apt_name: str, dong: str):
+    """네이버 부동산 매물 요약 (JSON, 비동기 로드용).
+
+    실패하면 {"available": False} 반환하여 프론트가 섹션을 숨김.
+    """
+    try:
+        result = get_listings_summary(apt_name, dong)
+        if result:
+            return JSONResponse({"available": True, **result})
+    except Exception as e:
+        print(f"⚠️  /api/listings 실패 ({apt_name}): {e}")
+    return JSONResponse({"available": False})

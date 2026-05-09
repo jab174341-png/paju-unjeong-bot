@@ -28,55 +28,16 @@
 <h1>{{ apt_name }}</h1>
 {% if apt_info %}<p class="subtitle">{{ apt_info.dong }}</p>{% endif %}
 
-{# ─── 현재 매물 (네이버 부동산) ─────────────────────────── #}
-{% if listings %}
-<section class="listings-section">
+{# ─── 현재 매물 (비동기 로드, 네이버 부동산) ─────────────── #}
+{% if apt_info %}
+<section id="listings-async"
+         data-apt="{{ apt_name }}"
+         data-dong="{{ apt_info.dong }}"
+         class="listings-section listings-loading">
   <div class="listings-header">
     <h2>🏠 현재 매물 <small>(네이버 부동산)</small></h2>
-    {% if listings.has_small_medium %}
-      <span class="badge-match">59·74㎡대 매물 있을 가능성</span>
-    {% else %}
-      <span class="badge-no-match">현재 84㎡↑ 위주</span>
-    {% endif %}
+    <span class="badge-loading">불러오는 중…</span>
   </div>
-
-  <div class="listings-grid">
-    <div class="listing-stat">
-      <div class="listing-label">매매</div>
-      <div class="listing-value primary">{{ listings.deal_count }}건</div>
-    </div>
-    <div class="listing-stat">
-      <div class="listing-label">전세</div>
-      <div class="listing-value">{{ listings.lease_count }}건</div>
-    </div>
-    <div class="listing-stat">
-      <div class="listing-label">월세</div>
-      <div class="listing-value">{{ listings.rent_count }}건</div>
-    </div>
-    <div class="listing-stat wide">
-      <div class="listing-label">매매가 범위</div>
-      <div class="listing-value">{{ listings.price_min }} ~ {{ listings.price_max }}</div>
-    </div>
-    <div class="listing-stat wide">
-      <div class="listing-label">매물 평형 범위 (전용)</div>
-      <div class="listing-value">
-        {{ '%.0f' % listings.area_min }}㎡ ~ {{ '%.0f' % listings.area_max }}㎡
-      </div>
-    </div>
-  </div>
-
-  <a href="{{ listings.naver_url }}" target="_blank" rel="noopener noreferrer" class="naver-link">
-    네이버 부동산에서 매물 상세 보기 →
-  </a>
-
-  <p class="listings-note">
-    ※ 사용자 조건: <strong>전용 59㎡·74㎡대</strong>(공급 ≈ 25·28평).
-    {% if listings.has_small_medium %}
-      이 단지는 80㎡ 이하 매물이 있을 가능성이 있습니다 (네이버 링크에서 확인).
-    {% else %}
-      이 단지는 현재 84㎡(공급 33평)↑ 위주로 매물이 등록되어 있어 조건과 안 맞을 수 있습니다.
-    {% endif %}
-  </p>
 </section>
 {% endif %}
 
@@ -133,6 +94,57 @@
   </section>
   {% endfor %}
 {% endif %}
+
+<script>
+  // 네이버 매물 정보를 비동기로 가져와 매물 섹션을 채움
+  // 실패하면 섹션 자체를 숨김 (페이지 자체는 즉시 표시되어 UX 보장)
+  (function () {
+    const sec = document.getElementById('listings-async');
+    if (!sec) return;
+    const apt = sec.dataset.apt;
+    const dong = sec.dataset.dong;
+    if (!apt || !dong) { sec.remove(); return; }
+
+    const url = '/api/listings?apt_name=' + encodeURIComponent(apt) + '&dong=' + encodeURIComponent(dong);
+
+    function fmtArea(n) { return Math.round(parseFloat(n)) + '㎡'; }
+
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.available) { sec.remove(); return; }
+        const small = data.has_small_medium;
+        const badge = small
+          ? '<span class="badge-match">59·74㎡대 매물 있을 가능성</span>'
+          : '<span class="badge-no-match">현재 84㎡↑ 위주</span>';
+        const note = small
+          ? '이 단지는 80㎡ 이하 매물이 있을 가능성이 있습니다 (네이버 링크에서 확인).'
+          : '이 단지는 현재 84㎡(공급 33평)↑ 위주로 매물이 등록되어 있어 조건과 안 맞을 수 있습니다.';
+        sec.classList.remove('listings-loading');
+        sec.innerHTML = (
+          '<div class="listings-header">' +
+            '<h2>🏠 현재 매물 <small>(네이버 부동산)</small></h2>' + badge +
+          '</div>' +
+          '<div class="listings-grid">' +
+            '<div class="listing-stat"><div class="listing-label">매매</div>' +
+              '<div class="listing-value primary">' + data.deal_count + '건</div></div>' +
+            '<div class="listing-stat"><div class="listing-label">전세</div>' +
+              '<div class="listing-value">' + data.lease_count + '건</div></div>' +
+            '<div class="listing-stat"><div class="listing-label">월세</div>' +
+              '<div class="listing-value">' + data.rent_count + '건</div></div>' +
+            '<div class="listing-stat wide"><div class="listing-label">매매가 범위</div>' +
+              '<div class="listing-value">' + data.price_min + ' ~ ' + data.price_max + '</div></div>' +
+            '<div class="listing-stat wide"><div class="listing-label">매물 평형 범위 (전용)</div>' +
+              '<div class="listing-value">' + fmtArea(data.area_min) + ' ~ ' + fmtArea(data.area_max) + '</div></div>' +
+          '</div>' +
+          '<a href="' + data.naver_url + '" target="_blank" rel="noopener noreferrer" class="naver-link">' +
+            '네이버 부동산에서 매물 상세 보기 →</a>' +
+          '<p class="listings-note">※ 사용자 조건: <strong>전용 59㎡·74㎡대</strong>(공급 ≈ 25·28평). ' + note + '</p>'
+        );
+      })
+      .catch(function () { sec.remove(); });
+  })();
+</script>
 
 <section class="recent">
   <h2>최근 거래 10건</h2>
