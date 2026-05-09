@@ -1,6 +1,28 @@
 {% extends "base.html" %}
 {% block title %}{{ apt_name }} · 파주 운정 시세{% endblock %}
 {% block content %}
+<script>
+  // 이 단지 방문 기록을 브라우저 로컬 저장소에 추가 (홈에서 위로 끌어올리는 용)
+  (function () {
+    const KEY = 'recent_complexes';
+    const apt = {{ apt_name | tojson }};
+    let recent;
+    try {
+      recent = JSON.parse(localStorage.getItem(KEY) || '[]');
+    } catch (_) {
+      recent = [];
+    }
+    // 기존에 있으면 제거하고 맨 앞에 다시 넣기
+    recent = recent.filter(function (n) { return n !== apt; });
+    recent.unshift(apt);
+    // 최대 10개만 유지
+    recent = recent.slice(0, 10);
+    try {
+      localStorage.setItem(KEY, JSON.stringify(recent));
+    } catch (_) {}
+  })();
+</script>
+
 <a href="/" class="back-link">← 단지 목록으로</a>
 
 <h1>{{ apt_name }}</h1>

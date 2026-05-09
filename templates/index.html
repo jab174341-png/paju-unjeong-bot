@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>운정신도시 단지 시세</h1>
-<p class="subtitle">최근 3개월 평균 거래가 · 거래 가장 많은 평형 대표 표시</p>
+<p class="subtitle">최근 3개월 평균 거래가 · 거래 가장 많은 평형 대표 표시 · 최근 본 단지가 위로 정렬됨</p>
 
 <div class="card-grid">
   {% for c in cards %}
-  <a href="/complex/{{ c.name }}" class="card">
+  <a href="/complex/{{ c.name }}" class="card" data-name="{{ c.name }}">
     <div class="card-dong">{{ c.dong }}</div>
     <h3 class="card-title">{{ c.name }}</h3>
     {% if c.stats %}
@@ -26,4 +26,37 @@
   </a>
   {% endfor %}
 </div>
+
+<script>
+  // 최근 본 단지를 위로 끌어올림 (브라우저 로컬 저장소 기반)
+  (function () {
+    const KEY = 'recent_complexes';
+    let recent;
+    try {
+      recent = JSON.parse(localStorage.getItem(KEY) || '[]');
+    } catch (_) {
+      recent = [];
+    }
+    if (!recent.length) return;
+
+    const grid = document.querySelector('.card-grid');
+    if (!grid) return;
+
+    // 카드들을 단지명으로 인덱싱
+    const cardByName = {};
+    grid.querySelectorAll('.card').forEach(function (card) {
+      const n = card.getAttribute('data-name');
+      if (n) cardByName[n] = card;
+    });
+
+    // 가장 최근 단지가 맨 위에 가도록 역순으로 prepend
+    for (let i = recent.length - 1; i >= 0; i--) {
+      const card = cardByName[recent[i]];
+      if (card) {
+        grid.insertBefore(card, grid.firstChild);
+        card.classList.add('recently-visited');
+      }
+    }
+  })();
+</script>
 {% endblock %}

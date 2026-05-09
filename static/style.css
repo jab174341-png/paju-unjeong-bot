@@ -85,6 +85,22 @@ h2 { font-size: 17px; font-weight: 600; margin: 20px 0 14px; }
   color: #94a3b8; font-size: 13px; padding: 18px 0;
 }
 
+/* 최근 본 단지 표시 */
+.card.recently-visited {
+  border-color: #3b82f6;
+  position: relative;
+  box-shadow: 0 0 0 1px #3b82f6, 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+.card.recently-visited::before {
+  content: '🕐 최근 본';
+  position: absolute;
+  top: -10px; left: 12px;
+  background: #3b82f6; color: white;
+  font-size: 10px; font-weight: 600;
+  padding: 3px 8px; border-radius: 10px;
+  letter-spacing: 0.3px;
+}
+
 /* ───── 상세: 기간 탭 ───── */
 .back-link {
   display: inline-block; margin-bottom: 14px;
