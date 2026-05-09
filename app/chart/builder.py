@@ -14,13 +14,29 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import pandas as pd
 
-# 한글 폰트 자동 설정 (Render 리눅스 컨테이너에는 한글 폰트가 없음)
-# koreanize_matplotlib 는 나눔고딕 TTF를 패키지에 내장하여 어디서든 작동.
-# import 만으로 plt.rcParams 가 자동 설정됨.
+import os
+
+# 한글 폰트 강제 설정 (Render 리눅스 컨테이너에 한글 폰트가 없을 때 대비).
+# koreanize_matplotlib 패키지에 번들된 NanumGothic TTF 파일을 직접 잡아서
+# FontProperties 로 모든 텍스트 요소에 명시 적용. rcParams 만 설정하면
+# 일부 매니저 캐시 상황에서 적용이 안 됨.
+KOREAN_FONT_PROP = None
 try:
-    import koreanize_matplotlib  # noqa: F401  (import 자체가 설정 트리거)
+    import koreanize_matplotlib  # noqa: F401
+    _pkg_dir = os.path.dirname(koreanize_matplotlib.__file__)
+    for _candidate in (
+        os.path.join(_pkg_dir, "fonts", "NanumGothic-Regular.ttf"),
+        os.path.join(_pkg_dir, "NanumGothic-Regular.ttf"),
+        os.path.join(_pkg_dir, "fonts", "NanumGothic.ttf"),
+        os.path.join(_pkg_dir, "NanumGothic.ttf"),
+    ):
+        if os.path.exists(_candidate):
+            fm.fontManager.addfont(_candidate)
+            KOREAN_FONT_PROP = fm.FontProperties(fname=_candidate)
+            plt.rcParams["font.family"] = KOREAN_FONT_PROP.get_name()
+            break
 except Exception as e:
-    print(f"⚠️  koreanize-matplotlib 로드 실패, 한글 깨질 수 있음: {e}")
+    print(f"⚠️  한글 폰트 설정 실패 (한글이 깨질 수 있음): {e}")
 
 # 차트 PNG 파일 캐시 유효 기간 (초)
 # 거래 데이터가 자주 바뀌지 않으므로 10분간 재사용해도 충분
@@ -78,7 +94,7 @@ def build_trend_chart(
         markeredgewidth=2, markeredgecolor="#3b82f6",
     )
 
-    # 데이터 포인트 위에 값 표시
+    # 데이터 포인트 위에 값 표시 (ASCII 숫자라서 폰트 영향 없음)
     for i, v in enumerate(amounts_eok):
         ax.annotate(
             f"{v:.1f}", (i, v),
@@ -86,8 +102,19 @@ def build_trend_chart(
             ha="center", fontsize=9, color="#1e3a8a",
         )
 
-    ax.set_title(f"{apt_name}  {area_bucket}  월별 평균가", fontsize=13, pad=15)
-    ax.set_ylabel("평균 거래가 (억원)", fontsize=11)
+    # 한글 텍스트는 fontproperties 명시적으로 적용
+    title_kwargs = {"fontsize": 13, "pad": 15}
+    ylabel_kwargs = {"fontsize": 11}
+    if KOREAN_FONT_PROP is not None:
+        title_kwargs["fontproperties"] = KOREAN_FONT_PROP
+        ylabel_kwargs["fontproperties"] = KOREAN_FONT_PROP
+    ax.set_title(f"{apt_name}  {area_bucket}  월별 평균가", **title_kwargs)
+    ax.set_ylabel("평균 거래가 (억원)", **ylabel_kwargs)
+
+    # x축 라벨 (월) 한글 폰트 적용 (혹시 모를 한글 들어갈 때 대비)
+    if KOREAN_FONT_PROP is not None:
+        for lbl in ax.get_xticklabels() + ax.get_yticklabels():
+            lbl.set_fontproperties(KOREAN_FONT_PROP)
     ax.grid(True, alpha=0.3, linestyle="--")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
