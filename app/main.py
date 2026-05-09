@@ -9,6 +9,7 @@
     uvicorn app.main:app --reload
 """
 
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -22,6 +23,59 @@ from app.analysis.aggregate import summarize_complex, get_trend_series
 from app.analysis.listings import get_listings_summary
 from app.chart.builder import build_trend_chart
 from app.data.complexes import UNJEONG_COMPLEXES
+
+# ─── 메모리 캐시 (서버 재시작 시 초기화) ───────────────────
+# Render 무료 플랜은 CPU 0.1, RAM 512MB로 빠듯해서, 매 요청마다
+# 12개월 거래 데이터를 다시 분석하면 1~2초 걸립니다.
+# 결과를 짧게 메모리에 캐시해서 반복 요청을 즉시 처리합니다.
+_trades_cache = {"df": None, "expires_at": None}
+_home_cards_cache = {"cards": None, "expires_at": None}
+TRADES_TTL = timedelta(minutes=30)
+HOME_CARDS_TTL = timedelta(minutes=10)
+
+
+def _get_trades_cached():
+    """12개월치 운정 거래 DataFrame을 30분 캐시로 반환."""
+    now = datetime.now()
+    if (
+        _trades_cache["df"] is not None
+        and _trades_cache["expires_at"]
+        and now < _trades_cache["expires_at"]
+    ):
+        return _trades_cache["df"]
+    df = load_unjeong_trades(months=12)
+    _trades_cache["df"] = df
+    _trades_cache["expires_at"] = now + TRADES_TTL
+    return df
+
+
+def _build_home_cards():
+    """모든 단지의 카드 데이터(3개월 대표 평형) 계산."""
+    df = _get_trades_cached()
+    cards = []
+    for c in UNJEONG_COMPLEXES:
+        summary = summarize_complex(df, c["name"], period="3M")
+        if not summary:
+            cards.append({**c, "main_bucket": None, "stats": None})
+            continue
+        main_bucket = max(summary.keys(), key=lambda b: summary[b]["count"])
+        cards.append({**c, "main_bucket": main_bucket, "stats": summary[main_bucket]})
+    return cards
+
+
+def _get_home_cards_cached():
+    """홈 카드 결과를 10분 캐시로 반환."""
+    now = datetime.now()
+    if (
+        _home_cards_cache["cards"] is not None
+        and _home_cards_cache["expires_at"]
+        and now < _home_cards_cache["expires_at"]
+    ):
+        return _home_cards_cache["cards"]
+    cards = _build_home_cards()
+    _home_cards_cache["cards"] = cards
+    _home_cards_cache["expires_at"] = now + HOME_CARDS_TTL
+    return cards
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -49,19 +103,11 @@ templates.env.filters["won"] = fmt_won
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    """홈: 30개 단지 카드 그리드. 각 카드에 최근 3개월 대표 평형 시세 표시."""
-    df = load_unjeong_trades(months=12)
+    """홈: 단지 카드 그리드. 각 카드에 최근 3개월 대표 평형 시세 표시.
 
-    cards = []
-    for c in UNJEONG_COMPLEXES:
-        summary = summarize_complex(df, c["name"], period="3M")
-        if not summary:
-            cards.append({**c, "main_bucket": None, "stats": None})
-            continue
-        # 거래 가장 많은 평형을 대표로
-        main_bucket = max(summary.keys(), key=lambda b: summary[b]["count"])
-        cards.append({**c, "main_bucket": main_bucket, "stats": summary[main_bucket]})
-
+    카드 데이터는 메모리에 10분간 캐시되어 반복 요청에 즉시 응답.
+    """
+    cards = _get_home_cards_cached()
     return templates.TemplateResponse("index.html", {
         "request": request,
         "cards": cards,
@@ -72,7 +118,7 @@ def home(request: Request):
 def detail(request: Request, apt_name: str, period: str = "3M"):
     """단지 상세: 기간 선택 + 평형별 통계 + 차트 + 최근 거래."""
     apt_name = unquote(apt_name)
-    df = load_unjeong_trades(months=12)
+    df = _get_trades_cached()
 
     summary = summarize_complex(df, apt_name, period=period)
 

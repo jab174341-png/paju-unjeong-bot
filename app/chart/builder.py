@@ -1,5 +1,10 @@
-"""matplotlib으로 시세 추이 차트 PNG를 생성하여 static/charts/에 저장."""
+"""matplotlib으로 시세 추이 차트 PNG를 생성하여 static/charts/에 저장.
 
+차트는 파일로 캐시되며, CHART_CACHE_SECONDS 이내에 같은 단지·평형이
+다시 요청되면 재생성하지 않고 기존 파일 경로를 반환합니다 (matplotlib는 느려서).
+"""
+
+import time
 from pathlib import Path
 from typing import Optional
 import matplotlib
@@ -8,6 +13,10 @@ matplotlib.use("Agg")  # GUI 없는 서버 환경에서도 작동
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import pandas as pd
+
+# 차트 PNG 파일 캐시 유효 기간 (초)
+# 거래 데이터가 자주 바뀌지 않으므로 10분간 재사용해도 충분
+CHART_CACHE_SECONDS = 10 * 60
 
 CHART_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "charts"
 CHART_DIR.mkdir(parents=True, exist_ok=True)
@@ -57,6 +66,12 @@ def build_trend_chart(
 
     filename = f"{safe_filename(apt_name)}__{safe_filename(area_bucket)}.png"
     filepath = CHART_DIR / filename
+
+    # 파일이 이미 있고 신선하면 재생성 스킵 (matplotlib가 느림)
+    if filepath.exists():
+        age = time.time() - filepath.stat().st_mtime
+        if age < CHART_CACHE_SECONDS:
+            return f"/static/charts/{filename}"
 
     fig, ax = plt.subplots(figsize=(10, 4.2), dpi=110)
 
