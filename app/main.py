@@ -86,14 +86,29 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """서버 시작 시 캐시를 미리 워밍해서 첫 사용자 요청이 즉시 응답되도록 함.
-
-    워밍하지 않으면 첫 요청이 12개월 거래 데이터를 SQLite + 국토부 API에서
-    다시 빌드하느라 5~10초 걸림. 워밍은 그 비용을 startup으로 옮김.
+    """서버 시작 시:
+    1) 차트 캐시 디렉토리를 비워서 stale 차트 제거 (이전 배포에서 깨진 차트 방지)
+    2) 거래 데이터 + 홈 카드 캐시 워밍해서 첫 사용자 요청이 즉시 응답되게 함
     """
+    # 1) 차트 디렉토리 정리
+    try:
+        chart_dir = PROJECT_ROOT / "static" / "charts"
+        if chart_dir.exists():
+            removed = 0
+            for f in chart_dir.glob("*.png"):
+                try:
+                    f.unlink()
+                    removed += 1
+                except Exception:
+                    pass
+            print(f"🧹 차트 캐시 정리: {removed}개 PNG 삭제")
+    except Exception as e:
+        print(f"⚠️  차트 캐시 정리 실패: {e}")
+
+    # 2) 데이터 캐시 워밍
     try:
         print("🔥 서버 시작: 캐시 워밍 중...")
-        cards = _get_home_cards_cached()  # _trades_cache도 같이 워밍됨
+        cards = _get_home_cards_cached()
         print(f"✅ 캐시 워밍 완료 ({len(cards)}개 단지)")
     except Exception as e:
         print(f"⚠️  캐시 워밍 실패 (서버는 정상 작동): {e}")
