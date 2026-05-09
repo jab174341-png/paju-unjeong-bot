@@ -9,6 +9,7 @@
     uvicorn app.main:app --reload
 """
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote, quote
@@ -30,8 +31,11 @@ from app.data.complexes import UNJEONG_COMPLEXES
 # 결과를 짧게 메모리에 캐시해서 반복 요청을 즉시 처리합니다.
 _trades_cache = {"df": None, "expires_at": None}
 _home_cards_cache = {"cards": None, "expires_at": None}
-TRADES_TTL = timedelta(minutes=30)
-HOME_CARDS_TTL = timedelta(minutes=10)
+# UptimeRobot이 5분마다 핑을 쳐서 서버를 깨워두므로, 메모리 캐시가
+# 자주 비워지지 않습니다. TTL을 길게 잡아 캐시 미스 페널티를 최소화.
+# (실제 데이터 갱신은 SQLite 캐시 레이어에서 별도로 일어남)
+TRADES_TTL = timedelta(hours=4)
+HOME_CARDS_TTL = timedelta(hours=1)
 
 
 def _get_trades_cached():
@@ -79,7 +83,24 @@ def _get_home_cards_cached():
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-app = FastAPI(title="파주 운정 시세 대시보드")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """서버 시작 시 캐시를 미리 워밍해서 첫 사용자 요청이 즉시 응답되도록 함.
+
+    워밍하지 않으면 첫 요청이 12개월 거래 데이터를 SQLite + 국토부 API에서
+    다시 빌드하느라 5~10초 걸림. 워밍은 그 비용을 startup으로 옮김.
+    """
+    try:
+        print("🔥 서버 시작: 캐시 워밍 중...")
+        cards = _get_home_cards_cached()  # _trades_cache도 같이 워밍됨
+        print(f"✅ 캐시 워밍 완료 ({len(cards)}개 단지)")
+    except Exception as e:
+        print(f"⚠️  캐시 워밍 실패 (서버는 정상 작동): {e}")
+    yield
+
+
+app = FastAPI(title="파주 운정 시세 대시보드", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=PROJECT_ROOT / "static"), name="static")
 templates = Jinja2Templates(directory=PROJECT_ROOT / "templates")
 
