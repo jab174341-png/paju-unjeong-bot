@@ -158,12 +158,19 @@ def detail(request: Request, apt_name: str, period: str = "3M"):
 
     summary = summarize_complex(df, apt_name, period=period)
 
-    # 차트는 /chart endpoint에서 비동기로 생성됨 (페이지 즉시 응답 보장)
-    # 여기선 URL만 만들어 템플릿에 전달
+    # 차트는 /chart endpoint 에서 비동기로 생성됨 (페이지 즉시 응답 보장).
+    # URL에 cache-bust 파라미터(파일 mtime)를 포함시켜 차트가 재생성될 때마다
+    # URL 자체가 바뀌게 함 → 브라우저가 옛 PNG를 캐시해서 보여주는 문제 방지.
+    chart_dir = PROJECT_ROOT / "static" / "charts"
     charts = {}
     for bucket in summary.keys():
+        # safe_filename 과 동일한 변환 로직
+        safe_apt = "".join(c if c.isalnum() else "_" for c in apt_name)[:80]
+        safe_bkt = "".join(c if c.isalnum() else "_" for c in bucket)[:80]
+        chart_file = chart_dir / f"{safe_apt}__{safe_bkt}.png"
+        v = int(chart_file.stat().st_mtime) if chart_file.exists() else 0
         charts[bucket] = (
-            f"/chart?apt_name={quote(apt_name)}&bucket={quote(bucket)}"
+            f"/chart?apt_name={quote(apt_name)}&bucket={quote(bucket)}&v={v}"
         )
 
     # 최근 거래 10건
@@ -190,12 +197,16 @@ def detail(request: Request, apt_name: str, period: str = "3M"):
 
 
 @app.get("/chart")
-def chart_endpoint(apt_name: str, bucket: str):
+def chart_endpoint(apt_name: str, bucket: str, v: int = 0):
     """차트 PNG를 즉석 생성하여 서빙. 페이지 렌더와 분리되어 병렬 로드.
 
     matplotlib 차트 생성은 약 1초/장이 걸리므로, 페이지 렌더 핸들러에서
     분리해야 페이지를 즉시 응답할 수 있음. 브라우저는 <img> 태그로 이
     엔드포인트를 호출하고, 동시에 다른 차트도 병렬로 가져옴.
+
+    v 파라미터는 cache-bust 용도로만 사용 (실제 처리에는 영향 없음).
+    detail 핸들러에서 차트 파일의 mtime을 v=...에 넣어주면 차트가
+    재생성될 때마다 URL이 달라져 브라우저가 자동으로 새 PNG를 받음.
     """
     try:
         df = _get_trades_cached()
