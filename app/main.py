@@ -11,12 +11,12 @@
 
 from datetime import datetime, timedelta
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, quote
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 
 from app.analysis.loader import load_unjeong_trades
 from app.analysis.aggregate import summarize_complex, get_trend_series
@@ -122,11 +122,13 @@ def detail(request: Request, apt_name: str, period: str = "3M"):
 
     summary = summarize_complex(df, apt_name, period=period)
 
-    # 평형별 차트 생성
+    # 차트는 /chart endpoint에서 비동기로 생성됨 (페이지 즉시 응답 보장)
+    # 여기선 URL만 만들어 템플릿에 전달
     charts = {}
     for bucket in summary.keys():
-        trend = get_trend_series(df, apt_name, bucket, months=12)
-        charts[bucket] = build_trend_chart(trend, apt_name, bucket)
+        charts[bucket] = (
+            f"/chart?apt_name={quote(apt_name)}&bucket={quote(bucket)}"
+        )
 
     # 최근 거래 10건
     recent_df = (
@@ -149,6 +151,42 @@ def detail(request: Request, apt_name: str, period: str = "3M"):
         "charts": charts,
         "recent": recent,
     })
+
+
+@app.get("/chart")
+def chart_endpoint(apt_name: str, bucket: str):
+    """차트 PNG를 즉석 생성하여 서빙. 페이지 렌더와 분리되어 병렬 로드.
+
+    matplotlib 차트 생성은 약 1초/장이 걸리므로, 페이지 렌더 핸들러에서
+    분리해야 페이지를 즉시 응답할 수 있음. 브라우저는 <img> 태그로 이
+    엔드포인트를 호출하고, 동시에 다른 차트도 병렬로 가져옴.
+    """
+    try:
+        df = _get_trades_cached()
+        trend = get_trend_series(df, apt_name, bucket, months=12)
+        if trend.empty:
+            raise HTTPException(status_code=404, detail="no trend data")
+
+        path = build_trend_chart(trend, apt_name, bucket)
+        if not path:
+            raise HTTPException(status_code=404, detail="chart build failed")
+
+        # path: '/static/charts/foo.png'
+        file_path = PROJECT_ROOT / path.lstrip("/")
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="chart file missing")
+
+        # 브라우저가 캐시할 수 있게 Cache-Control 설정 (10분)
+        return FileResponse(
+            file_path,
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=600"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"⚠️  Chart endpoint error ({apt_name}/{bucket}): {e}")
+        raise HTTPException(status_code=500, detail="chart generation failed")
 
 
 @app.get("/api/listings")
