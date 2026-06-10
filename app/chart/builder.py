@@ -2,6 +2,14 @@
 
 차트는 파일로 캐시되며, CHART_CACHE_SECONDS 이내에 같은 단지·평형이
 다시 요청되면 재생성하지 않고 기존 파일 경로를 반환합니다 (matplotlib는 느려서).
+
+⚠️ 스레드 안전성:
+FastAPI는 동기 핸들러를 스레드풀에서 실행하고, 상세 페이지는 평형별
+차트(84/59/100㎡)를 브라우저가 동시에 병렬 요청합니다. 전역 pyplot
+상태(plt.gcf/plt.savefig/plt.close 등)는 스레드 안전하지 않아, 한 스레드의
+savefig가 다른 스레드가 닫은 figure를 저장해 '백지 PNG'가 나오는 버그가
+있었습니다. 그래서 이 모듈은 pyplot 전역 상태를 쓰지 않고
+matplotlib.figure.Figure + FigureCanvasAgg 를 요청마다 독립적으로 생성합니다.
 """
 
 import time
@@ -10,8 +18,9 @@ from typing import Optional
 import matplotlib
 
 matplotlib.use("Agg")  # GUI 없는 서버 환경에서도 작동
-import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import pandas as pd
 
 import os
@@ -33,10 +42,9 @@ try:
         if os.path.exists(_candidate):
             fm.fontManager.addfont(_candidate)
             KOREAN_FONT_PROP = fm.FontProperties(fname=_candidate)
-            plt.rcParams["font.family"] = KOREAN_FONT_PROP.get_name()
             break
 except Exception as e:
-    print(f"⚠️  한글 폰트 설정 실패 (한글이 깨질 수 있음): {e}")
+    print(f"⚠️ 한글 폰트 설정 실패 (한글이 깨질 수 있음): {e}")
 
 # 차트 PNG 파일 캐시 유효 기간 (초)
 # 거래 데이터가 자주 바뀌지 않으므로 10분간 재사용해도 충분
@@ -44,10 +52,6 @@ CHART_CACHE_SECONDS = 10 * 60
 
 CHART_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "charts"
 CHART_DIR.mkdir(parents=True, exist_ok=True)
-
-
-# 마이너스 기호 깨짐 방지 (한글 폰트와 충돌하기 쉬움)
-plt.rcParams["axes.unicode_minus"] = False
 
 
 def safe_filename(name: str) -> str:
@@ -82,7 +86,14 @@ def build_trend_chart(
         if age < CHART_CACHE_SECONDS:
             return f"/static/charts/{filename}"
 
-    fig, ax = plt.subplots(figsize=(10, 4.2), dpi=110)
+    # pyplot 전역 상태를 쓰지 않고 Figure 를 직접 생성 (스레드 안전).
+    fig = Figure(figsize=(10, 4.2), dpi=110)
+    FigureCanvasAgg(fig)  # Agg 캔버스 연결 (savefig 보장)
+    ax = fig.subplots()
+
+    # 마이너스 기호 깨짐 방지 (한글 폰트와 충돌하기 쉬움)
+    ax.ticklabel_format(useOffset=False, axis="y")
+    fig.patch.set_facecolor("white")
 
     months = trend_df["month"].tolist()
     amounts_eok = [a / 10000 for a in trend_df["avg_amount"].tolist()]
@@ -108,10 +119,10 @@ def build_trend_chart(
     if KOREAN_FONT_PROP is not None:
         title_kwargs["fontproperties"] = KOREAN_FONT_PROP
         ylabel_kwargs["fontproperties"] = KOREAN_FONT_PROP
-    ax.set_title(f"{apt_name}  {area_bucket}  월별 평균가", **title_kwargs)
+    ax.set_title(f"{apt_name} {area_bucket} 월별 평균가", **title_kwargs)
     ax.set_ylabel("평균 거래가 (억원)", **ylabel_kwargs)
 
-    # x축 라벨 (월) 한글 폰트 적용 (혹시 모를 한글 들어갈 때 대비)
+    # x/y축 라벨 한글 폰트 적용 (혹시 모를 한글 들어갈 때 대비)
     if KOREAN_FONT_PROP is not None:
         for lbl in ax.get_xticklabels() + ax.get_yticklabels():
             lbl.set_fontproperties(KOREAN_FONT_PROP)
@@ -124,9 +135,13 @@ def build_trend_chart(
         margin = (max(amounts_eok) - min(amounts_eok)) * 0.2 or 0.5
         ax.set_ylim(min(amounts_eok) - margin, max(amounts_eok) + margin * 1.5)
 
-    plt.xticks(rotation=45, ha="right")
-    plt.tight_layout()
-    plt.savefig(filepath, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
+    # x축 라벨 회전 (pyplot 대신 OO API 사용)
+    for lbl in ax.get_xticklabels():
+        lbl.set_rotation(45)
+        lbl.set_horizontalalignment("right")
+
+    fig.tight_layout()
+    fig.savefig(filepath, bbox_inches="tight", facecolor="white")
+    # Figure 는 pyplot 에 등록되지 않으므로 close 불필요 (GC 가 회수).
 
     return f"/static/charts/{filename}"
